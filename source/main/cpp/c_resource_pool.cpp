@@ -6,9 +6,6 @@ namespace ncore
 {
     namespace ngfx
     {
-        // TODO Use hbb_t to identify free resources since it has a bias to allocate from the beginning of the pool.
-        // TODO: add bits for checking if resource is alive and use bitmasks.
-
         void object_pool_t::init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource)
         {
             ASSERT(sizeof_resource >= sizeof(u32));  // Resource size must be at least the size of a u32 since we use it as a linked list.
@@ -30,14 +27,14 @@ namespace ncore
             m_free_resource_map.release(allocator);
         }
 
-        void object_pool_t::free_all_resources()
+        void object_pool_t::free_all()
         {
             m_free_resource_index = 0;
             m_num_resource_used   = 0;
             m_free_resource_map.init_all_used_lazy();
         }
 
-        u32 object_pool_t::obtain_resource()
+        handle_t object_pool_t::obtain()
         {
             if (m_free_resource_index < m_num_resource_max)
             {
@@ -53,10 +50,10 @@ namespace ncore
                 return free_index;
             }
             ASSERTS(false, "Error: no more resources left!");
-            return c_invalid_index;
+            return c_invalid_handle;
         }
 
-        void object_pool_t::release_resource(u32 handle)
+        void object_pool_t::release(handle_t handle)
         {
             ASSERT(handle < m_free_resource_index);
 
@@ -77,10 +74,10 @@ namespace ncore
             }
         }
 
-        void* object_pool_t::access_resource(u32 handle)
+        void* object_pool_t::get_access(handle_t handle)
         {
             ASSERT(handle < m_free_resource_index);
-            if (handle != c_invalid_index)
+            if (handle != c_invalid_handle)
             {
                 ASSERTS(m_free_resource_map.is_used(handle), "Error: resource is not marked as being in use!");
                 return &m_resource_memory[handle * m_resource_sizeof];
@@ -88,15 +85,41 @@ namespace ncore
             return nullptr;
         }
 
-        const void* object_pool_t::access_resource(u32 handle) const
+        const void* object_pool_t::get_access(handle_t handle) const
         {
             ASSERT(handle < m_free_resource_index);
-            if (handle != c_invalid_index)
+            if (handle != c_invalid_handle)
             {
                 ASSERTS(m_free_resource_map.is_used(handle), "Error: resource is not marked as being in use!");
                 return &m_resource_memory[handle * m_resource_sizeof];
             }
             return nullptr;
+        }
+
+        void resources_pool_t::init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_types)
+        {
+            m_allocator              = allocator;
+            m_num_types              = 0;
+            m_max_types              = max_types;
+            m_max_resources_per_type = max_num_resources_per_type;
+            m_types                  = (type_t*)allocator->allocate(max_types * sizeof(type_t));
+        }
+
+        void resources_pool_t::shutdown()
+        {
+            for (u32 i = 0; i < m_num_types; i++)
+            {
+                m_types[i].m_resource_pool->shutdown(m_allocator);
+                m_allocator->deallocate(m_types[i].m_resource_pool);
+            }
+            m_allocator->deallocate(m_types);
+        }
+
+        void resources_pool_t::register_resource_pool(s16 type_index, u32 max_num_resources, u32 sizeof_resource)
+        {
+            ASSERT(type_index < m_max_types);
+            m_types[type_index].m_resource_pool = m_allocator->construct<object_pool_t>();
+            m_types[type_index].m_resource_pool->init(m_allocator, max_num_resources, sizeof_resource);
         }
 
     }  // namespace ngfx
