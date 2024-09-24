@@ -145,11 +145,14 @@ UNITTEST_SUITE_BEGIN(resource_pool)
             pool.init(Allocator, 32, 4);
 
             ngfx::handle_t h1 = pool.register_resource<ngfx::resource_a_t>();
-            CHECK_EQUAL((0<<24) | 0, h1);
+            CHECK_EQUAL(0, h1.index);
+            CHECK_EQUAL(0, h1.type);
             ngfx::handle_t h2 = pool.register_resource<ngfx::resource_b_t>();
-            CHECK_EQUAL((1<<24) | 0, h2);
+            CHECK_EQUAL(0, h2.index);
+            CHECK_EQUAL(1, h2.type);
             ngfx::handle_t h3 = pool.register_resource<ngfx::resource_c_t>();
-            CHECK_EQUAL((2<<24) | 0, h3);
+            CHECK_EQUAL(0, h3.index);
+            CHECK_EQUAL(2, h3.type);
 
             CHECK_TRUE(pool.is_resource_type<ngfx::resource_a_t>(h1));
             CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h1));

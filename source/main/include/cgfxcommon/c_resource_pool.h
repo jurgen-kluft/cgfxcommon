@@ -14,21 +14,26 @@ namespace ncore
 
     namespace ngfx
     {
-        typedef u32 handle_t;
+        struct handle_t
+        {
+            u32 index;
+            u16 type;
+            u16 generation;
+        };
 
         struct object_pool_t
         {
             void init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource);
             void shutdown(alloc_t* allocator);
 
-            handle_t obtain();  // Returns a handle/index to a resource.
-            void     release(handle_t handle);
-            void     free_all();
+            u32  obtain();  // Returns a handle/index to a resource.
+            void release(u32 handle);
+            void free_all();
 
-            void*       get_access(handle_t handle);
-            const void* get_access(handle_t handle) const;
+            void*       get_access(u32 handle);
+            const void* get_access(u32 handle) const;
 
-            static const handle_t c_invalid_handle = 0xffffffff;
+            static const u32 c_invalid_handle = 0xFFFFFFFF;
 
             binmap_t m_free_resource_map;
             byte*    m_resource_memory;
@@ -44,14 +49,14 @@ namespace ncore
             void init(alloc_t* allocator, u32 max_num_resources);
             void shutdown();
 
-            handle_t obtain();
-            void     release(handle_t);
+            u32  obtain();
+            void release(u32);
 
-            T*       get_access(handle_t handle);
-            const T* get_access(handle_t handle) const;
+            T*       get_access(u32 handle);
+            const T* get_access(u32 handle) const;
             T*       obtain_access()
             {
-                handle_t h = obtain();
+                u32 h = obtain();
                 return get_access(h);
             }
 
@@ -80,19 +85,19 @@ namespace ncore
         }
 
         template <typename T>
-        inline void resource_pool_t<T>::release(handle_t handle)
+        inline void resource_pool_t<T>::release(u32 handle)
         {
             m_resource_pool.release(handle);
         }
 
         template <typename T>
-        inline T* resource_pool_t<T>::get_access(handle_t handle)
+        inline T* resource_pool_t<T>::get_access(u32 handle)
         {
             return (T*)m_resource_pool.get_access(handle);
         }
 
         template <typename T>
-        inline const T* resource_pool_t<T>::get_access(handle_t handle) const
+        inline const T* resource_pool_t<T>::get_access(u32 handle) const
         {
             return (const T*)m_resource_pool.get_access(handle);
         }
@@ -118,8 +123,8 @@ namespace ncore
             void init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_num_types);
             void shutdown();
 
-            void*       get_access(u32 handle);
-            const void* get_access(u32 handle) const;
+            void*       get_access(handle_t handle);
+            const void* get_access(handle_t handle) const;
 
             template <typename T>
             T* get(handle_t handle)
@@ -150,27 +155,31 @@ namespace ncore
                     }
                 }
 
-                handle_t handle = m_types[resource_type_t<T>::s_type_index].m_resource_pool->obtain();
+                u32 res_index = m_types[resource_type_t<T>::s_type_index].m_resource_pool->obtain();
 
                 // Encode in the highest 8 bit the type index
-                return (handle_t)((resource_type_t<T>::s_type_index << 24) | handle);
+                handle_t handle;
+                handle.index = res_index;
+                handle.type  = resource_type_t<T>::s_type_index;
+                handle.generation = 0;
+                return handle;
             }
 
             template <typename T>
             bool is_resource_type(handle_t handle) const
             {
-                return (handle >> 24) == resource_type_t<T>::s_type_index;
+                return handle.type == resource_type_t<T>::s_type_index;
             }
 
             void release_resource(handle_t handle)
             {
-                const u32      type_index = handle >> 24;
-                const handle_t h          = handle & 0x00ffffff;
+                const u32 type_index = handle.type;
+                const u32 res_index  = handle.index;
                 ASSERT(type_index < m_num_types);
-                m_types[type_index].m_resource_pool->release(h);
+                m_types[type_index].m_resource_pool->release(res_index);
             }
 
-            static const handle_t c_invalid_handle = 0xffffffff;
+            static const handle_t c_invalid_handle;
 
             struct type_t
             {
@@ -185,6 +194,8 @@ namespace ncore
             u16      m_max_types;
             u32      m_max_resources_per_type;
         };
+
+        // Now we need a pool of resources where a resource is a specific type and can have additional 'components' that are also resources.
 
     }  // namespace ngfx
 }  // namespace ncore

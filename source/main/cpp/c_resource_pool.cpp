@@ -34,7 +34,7 @@ namespace ncore
             m_free_resource_map.init_all_used_lazy();
         }
 
-        handle_t object_pool_t::obtain()
+        u32 object_pool_t::obtain()
         {
             if (m_free_resource_index < m_num_resource_max)
             {
@@ -53,7 +53,7 @@ namespace ncore
             return c_invalid_handle;
         }
 
-        void object_pool_t::release(handle_t handle)
+        void object_pool_t::release(u32 handle)
         {
             ASSERT(handle < m_free_resource_index);
 
@@ -74,7 +74,7 @@ namespace ncore
             }
         }
 
-        void* object_pool_t::get_access(handle_t handle)
+        void* object_pool_t::get_access(u32 handle)
         {
             ASSERT(handle < m_free_resource_index);
             if (handle != c_invalid_handle)
@@ -85,7 +85,7 @@ namespace ncore
             return nullptr;
         }
 
-        const void* object_pool_t::get_access(handle_t handle) const
+        const void* object_pool_t::get_access(u32 handle) const
         {
             ASSERT(handle < m_free_resource_index);
             if (handle != c_invalid_handle)
@@ -95,6 +95,8 @@ namespace ncore
             }
             return nullptr;
         }
+
+        const handle_t resources_pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFF, 0xFFFF};
 
         void resources_pool_t::init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_types)
         {
