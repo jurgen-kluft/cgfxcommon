@@ -65,7 +65,7 @@ namespace ncore
                 m_free_resource_map.init_all_used_lazy();
             }
 
-            u32 pool_t::alloc()
+            u32 pool_t::allocate()
             {
                 if (m_free_resource_index < m_object_array.m_num_max)
                 {
@@ -84,7 +84,7 @@ namespace ncore
                 return c_invalid_handle;
             }
 
-            void pool_t::dealloc(u32 index)
+            void pool_t::deallocate(u32 index)
             {
                 ASSERT(index < m_free_resource_index);
 
@@ -132,12 +132,11 @@ namespace ncore
         {
             const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFFFFFF};
 
-            void pool_t::init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_types)
+            void pool_t::init(alloc_t* allocator, u16 max_types)
             {
                 m_allocator              = allocator;
                 m_num_types              = 0;
                 m_max_types              = max_types;
-                m_max_resources_per_type = max_num_resources_per_type;
                 m_types                  = (type_t*)allocator->allocate(max_types * sizeof(type_t));
             }
 
@@ -151,13 +150,13 @@ namespace ncore
                 m_allocator->deallocate(m_types);
             }
 
-            void* pool_t::get_access(handle_t handle)
+            void* pool_t::get_access_raw(handle_t handle)
             {
                 ASSERT(handle.type < m_num_types);
                 return m_types[handle.type].m_resource_pool->get_access(handle.index);
             }
 
-            const void* pool_t::get_access(handle_t handle) const
+            const void* pool_t::get_access_raw(handle_t handle) const
             {
                 ASSERT(handle.type < m_num_types);
                 return m_types[handle.type].m_resource_pool->get_access(handle.index);
@@ -249,27 +248,28 @@ namespace ncore
                 m_objects[object_type_index].m_a_resources = (nobject::pool_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::pool_t*));
             }
 
-            void pool_t::register_resource_type(u16 object_type_index, u16 resource_type_index, u32 max_num_resources, u32 sizeof_resource)
+            void pool_t::register_resource_type(u16 object_type_index, u16 resource_type_index, u32 sizeof_resource)
             {
                 ASSERT(object_type_index < m_max_object_types);
                 ASSERT(resource_type_index < m_max_resource_types);
+                const u32 max_num_resources = m_objects[object_type_index].m_object_pool->m_object_array.m_num_max;
                 m_objects[object_type_index].m_a_resources[resource_type_index] = m_allocator->construct<nobject::pool_t>();
                 m_objects[object_type_index].m_a_resources[resource_type_index]->init(m_allocator, max_num_resources, sizeof_resource);
             }
 
-            handle_t pool_t::alloc_object(u16 object_type_index)
+            handle_t pool_t::allocate_object(u16 object_type_index)
             {
                 ASSERT(object_type_index < m_max_object_types);
-                const u32 object_index = m_objects[object_type_index].m_object_pool->alloc();
+                const u32 object_index = m_objects[object_type_index].m_object_pool->allocate();
                 return make_object_handle(object_type_index, object_index);
             }
 
-            handle_t pool_t::alloc_resource(handle_t object_handle, u16 resource_type_index)
+            handle_t pool_t::allocate_resource(handle_t object_handle, u16 resource_type_index)
             {
                 const u16 object_type_index = get_object_type_index(object_handle);
                 ASSERT(object_type_index < m_max_object_types);
                 ASSERT(resource_type_index < m_max_resource_types);
-                const u32 resource_index = m_objects[object_type_index].m_a_resources[resource_type_index]->alloc();
+                const u32 resource_index = m_objects[object_type_index].m_a_resources[resource_type_index]->allocate();
                 return make_resource_handle(object_type_index, resource_type_index, resource_index);
             }
 
