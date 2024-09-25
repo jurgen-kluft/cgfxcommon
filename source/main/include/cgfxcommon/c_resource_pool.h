@@ -17,185 +17,377 @@ namespace ncore
         struct handle_t
         {
             u32 index;
-            u16 type;
-            u16 generation;
+            u32 type;
         };
 
-        struct object_pool_t
+        namespace nobject
         {
-            void init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource);
-            void shutdown(alloc_t* allocator);
-
-            u32  obtain();  // Returns a handle/index to a resource.
-            void release(u32 handle);
-            void free_all();
-
-            void*       get_access(u32 handle);
-            const void* get_access(u32 handle) const;
-
-            static const u32 c_invalid_handle = 0xFFFFFFFF;
-
-            binmap_t m_free_resource_map;
-            byte*    m_resource_memory;
-            u32      m_free_resource_index;
-            u32      m_num_resource_used;
-            u32      m_num_resource_max;
-            u32      m_resource_sizeof;
-        };
-
-        template <typename T>
-        struct resource_pool_t
-        {
-            void init(alloc_t* allocator, u32 max_num_resources);
-            void shutdown();
-
-            u32  obtain();
-            void release(u32);
-
-            T*       get_access(u32 handle);
-            const T* get_access(u32 handle) const;
-            T*       obtain_access()
+            struct array_t
             {
-                u32 h = obtain();
-                return get_access(h);
-            }
+                array_t();
 
-        protected:
-            object_pool_t m_resource_pool;
-            alloc_t*      m_allocator = nullptr;
-        };
+                byte* m_memory;
+                u32   m_sizeof;
+                u32   m_num_used;
+                u32   m_num_max;
 
-        template <typename T>
-        inline void resource_pool_t<T>::init(alloc_t* allocator_, u32 max_num_resources)
-        {
-            m_allocator = allocator_;
-            m_resource_pool.init(m_allocator, max_num_resources, sizeof(T));
-        }
+                void init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource);
+                void shutdown(alloc_t* allocator);
 
-        template <typename T>
-        inline void resource_pool_t<T>::shutdown()
-        {
-            m_resource_pool.shutdown(m_allocator);
-        }
+                void*       get_access(u32 index);
+                const void* get_access(u32 index) const;
+            };
 
-        template <typename T>
-        inline u32 resource_pool_t<T>::obtain()
-        {
-            return m_resource_pool.obtain();
-        }
+            struct pool_t
+            {
+                pool_t();
 
-        template <typename T>
-        inline void resource_pool_t<T>::release(u32 handle)
-        {
-            m_resource_pool.release(handle);
-        }
+                void init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource);
+                void shutdown(alloc_t* allocator);
 
-        template <typename T>
-        inline T* resource_pool_t<T>::get_access(u32 handle)
-        {
-            return (T*)m_resource_pool.get_access(handle);
-        }
+                u32  alloc();  //
+                void dealloc(u32 index);
+                void free_all();
 
-        template <typename T>
-        inline const T* resource_pool_t<T>::get_access(u32 handle) const
-        {
-            return (const T*)m_resource_pool.get_access(handle);
-        }
+                void*       get_access(u32 index);
+                const void* get_access(u32 index) const;
+
+                static const u32 c_invalid_handle = 0xFFFFFFFF;
+
+                array_t  m_object_array;
+                u32      m_free_resource_index;
+                binmap_t m_free_resource_map;
+            };
+
+            namespace ntyped
+            {
+                template <typename T>
+                struct pool_t
+                {
+                    void init(alloc_t* allocator, u32 max_num_resources);
+                    void shutdown();
+
+                    u32  alloc();
+                    void dealloc(u32 index);
+
+                    T*       get_access(u32 index);
+                    const T* get_access(u32 index) const;
+                    T*       obtain_access()
+                    {
+                        u32 index = alloc();
+                        return get_access(index);
+                    }
+
+                protected:
+                    nobject::pool_t m_object_pool;
+                    alloc_t*        m_allocator = nullptr;
+                };
+
+                template <typename T>
+                inline void pool_t<T>::init(alloc_t* allocator_, u32 max_num_resources)
+                {
+                    m_allocator = allocator_;
+                    m_object_pool.init(m_allocator, max_num_resources, sizeof(T));
+                }
+
+                template <typename T>
+                inline void pool_t<T>::shutdown()
+                {
+                    m_object_pool.shutdown(m_allocator);
+                }
+
+                template <typename T>
+                inline u32 pool_t<T>::alloc()
+                {
+                    return m_object_pool.alloc();
+                }
+
+                template <typename T>
+                inline void pool_t<T>::dealloc(u32 index)
+                {
+                    m_object_pool.dealloc(index);
+                }
+
+                template <typename T>
+                inline T* pool_t<T>::get_access(u32 index)
+                {
+                    return (T*)m_object_pool.get_access(index);
+                }
+
+                template <typename T>
+                inline const T* pool_t<T>::get_access(u32 index) const
+                {
+                    return (const T*)m_object_pool.get_access(index);
+                }
+
+            }  // namespace ntyped
+        }  // namespace nobject
 
         // A multi resource pool, where an item is of a specific resource type and the pool holds multiple resource pools.
         // We can allocate a specific resource and the index encodes the resource type so that we know which pool it belongs to.
 
-        template <typename T>
-        struct resource_type_t
+        // Pool that holds multiple resource pools
+        namespace nresources
         {
-            static s16 s_type_index;
-        };
+            struct pool_t
+            {
+                template <typename T>
+                struct resource_type_t
+                {
+                    static s16 s_type_index;
+                };
 
-#define DEFINE_RESOURCE(T) static resource_type_t<T> s_resource_type_##T
+                void init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_num_types);
+                void shutdown();
+
+                template <typename T>
+                T* get(handle_t handle)
+                {
+                    return (T*)get_access(handle);
+                }
+
+                template <typename T>
+                const T* get(handle_t handle) const
+                {
+                    return (const T*)get_access(handle);
+                }
+
+                // Register 'resource' by type
+                template <typename T>
+                bool register_resource()
+                {
+                    if (resource_type_t<T>::s_type_index < 0)
+                    {
+                        if (m_num_types < m_max_types)
+                        {
+                            resource_type_t<T>::s_type_index = m_num_types++;
+                            register_resource_pool(resource_type_t<T>::s_type_index, m_max_resources_per_type, sizeof(T));
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                template <typename T>
+                bool is_resource_type(handle_t handle) const
+                {
+                    return handle.type == resource_type_t<T>::s_type_index;
+                }
+
+                template <typename T>
+                handle_t alloc_resource()
+                {
+                    if (resource_type_t<T>::s_type_index < 0)
+                        return c_invalid_handle;
+
+                    handle_t handle;
+                    handle.index = m_types[resource_type_t<T>::s_type_index].m_resource_pool->alloc();
+                    handle.type  = resource_type_t<T>::s_type_index;
+                    return handle;
+                }
+
+                void dealloc_resource(handle_t handle)
+                {
+                    const u32 type_index = handle.type;
+                    const u32 res_index  = handle.index;
+                    ASSERT(type_index < m_num_types);
+                    m_types[type_index].m_resource_pool->dealloc(res_index);
+                }
+
+                static const handle_t c_invalid_handle;
+
+            private:
+                struct type_t
+                {
+                    nobject::pool_t* m_resource_pool;
+                };
+
+                void*       get_access(handle_t handle);
+                const void* get_access(handle_t handle) const;
+                void        register_resource_pool(s16 type_index, u32 max_num_resources, u32 sizeof_resource);
+
+                type_t*  m_types;
+                alloc_t* m_allocator;
+                s16      m_num_types;
+                u16      m_max_types;
+                u32      m_max_resources_per_type;
+            };
+        }  // namespace nresources
+#define DEFINE_RESOURCE(T)                                     \
+    namespace nresources                                       \
+    {                                                          \
+        static pool_t::resource_type_t<T> s_resource_type_##T; \
+    }
 
 #define DECLARE_RESOURCE(T) \
     template <>             \
-    s16 resource_type_t<T>::s_type_index = -1;
+    s16 nresources::pool_t::resource_type_t<T>::s_type_index = -1;
 
-        // Pool that holds multiple resource pools
-        struct resources_pool_t
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Now we need a pool of resources where a resource is a specific type and can have additional 'components' that are also resources.
+        namespace nobject_resources
         {
-            void init(alloc_t* allocator, u32 max_num_resources_per_type, u16 max_num_types);
-            void shutdown();
-
-            void*       get_access(handle_t handle);
-            const void* get_access(handle_t handle) const;
-
-            template <typename T>
-            T* get(handle_t handle)
+            struct pool_t
             {
-                return (T*)get_access(handle);
-            }
-
-            template <typename T>
-            const T* get(handle_t handle) const
-            {
-                return (const T*)get_access(handle);
-            }
-
-            // Register 'resource' by type
-            template <typename T>
-            handle_t register_resource()
-            {
-                if (resource_type_t<T>::s_type_index < 0)
+                template <typename T>
+                struct object_type_t
                 {
-                    if (m_num_types < m_max_types)
-                    {
-                        resource_type_t<T>::s_type_index = m_num_types++;
-                        register_resource_pool(resource_type_t<T>::s_type_index, m_max_resources_per_type, sizeof(T));
-                    }
-                    else
-                    {
-                        return c_invalid_handle;
-                    }
+                    static s8 s_type_index;
+                };
+
+                template <typename T>
+                struct resource_type_t
+                {
+                    static s8 s_type_index;
+                };
+
+                void init(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types);
+                void shutdown();
+
+                template <typename T>
+                T* get(handle_t handle)
+                {
+                    return (T*)get_access(handle);
                 }
 
-                u32 res_index = m_types[resource_type_t<T>::s_type_index].m_resource_pool->obtain();
+                template <typename T>
+                const T* get(handle_t handle) const
+                {
+                    return (const T*)get_access(handle);
+                }
 
-                // Encode in the highest 8 bit the type index
-                handle_t handle;
-                handle.index = res_index;
-                handle.type  = resource_type_t<T>::s_type_index;
-                handle.generation = 0;
-                return handle;
-            }
+                // Register 'object' by type
+                template <typename T>
+                bool register_object_type(u32 max_instances)
+                {
+                    if (object_type_t<T>::s_type_index < 0)
+                    {
+                        if (m_num_objects < m_max_objects)
+                        {
+                            object_type_t<T>::s_type_index = m_num_objects++;
+                            register_object_type(object_type_t<T>::s_type_index, max_instances, sizeof(T), m_max_resources);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
 
-            template <typename T>
-            bool is_resource_type(handle_t handle) const
-            {
-                return handle.type == resource_type_t<T>::s_type_index;
-            }
+                // Register 'object' by type
+                template <typename T, typename R>
+                bool register_resource_type(u32 max_num_resources)
+                {
+                    if (object_type_t<T>::s_type_index < 0)
+                        return false;
 
-            void release_resource(handle_t handle)
-            {
-                const u32 type_index = handle.type;
-                const u32 res_index  = handle.index;
-                ASSERT(type_index < m_num_types);
-                m_types[type_index].m_resource_pool->release(res_index);
-            }
+                    if (resource_type_t<R>::s_type_index < 0)
+                    {
+                        if (m_num_resources < m_max_resources)
+                        {
+                            resource_type_t<R>::s_type_index = m_num_resources++;
+                            register_resource_type(object_type_t<T>::s_type_index, resource_type_t<R>::s_type_index, max_num_resources, sizeof(T));
+                            return true;
+                        }
+                    }
+                    return false;
+                }
 
-            static const handle_t c_invalid_handle;
+                template <typename T>
+                bool is_resource_type(handle_t handle) const
+                {
+                    return handle.type == resource_type_t<T>::s_type_index;
+                }
 
-            struct type_t
-            {
-                object_pool_t* m_resource_pool;
+                template <typename T>
+                handle_t alloc_object()
+                {
+                    if (object_type_t<T>::s_type_index < 0)
+                        return c_invalid_handle;
+                    return alloc_object(object_type_t<T>::s_type_index);
+                }
+
+                // Add a 'resource' to an 'object'
+                template <typename T>
+                handle_t add_resource(handle_t object_handle)
+                {
+                    if (resource_type_t<T>::s_type_index < 0)
+                        return c_invalid_handle;
+                    return alloc_resource(object_handle, resource_type_t<T>::s_type_index);
+                }
+
+                template <typename T>
+                bool is_object(handle_t handle) const
+                {
+                    return handle.type == resource_type_t<T>::s_type_index;
+                }
+
+                void dealloc_resource(handle_t handle)
+                {
+                    const u32 type_index = handle.type;
+                    const u32 res_index  = handle.index;
+                    ASSERT(type_index < m_num_objects);
+                    m_objects[type_index].m_object_pool->dealloc(res_index);
+                }
+
+                template <typename T>
+                bool has_resource(handle_t object_handle) const
+                {
+                    const u32 obj_type_index     = object_handle.type;
+                    const u32 obj_instance_index = object_handle.index;
+                    const u32 res_type_index     = resource_type_t<T>::s_type_index;
+                    ASSERT(obj_type_index < m_num_objects);
+                    return m_objects[obj_type_index].m_a_resources[res_type_index] != nullptr;
+                }
+
+                static const handle_t c_invalid_handle;
+
+            private:
+                struct object_t
+                {
+                    nobject::pool_t*  m_object_pool;
+                    nobject::pool_t** m_a_resources;  // m_a_resources[m_max_resources]
+                };
+
+                void*       get_access(handle_t handle);
+                const void* get_access(handle_t handle) const;
+                void        register_object_type(s16 object_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_resources);
+                void        register_resource_type(s16 object_index, s16 resource_index, u32 max_num_resources, u32 sizeof_resource);
+                handle_t    alloc_object(s16 object_type_index);
+                handle_t    alloc_resource(handle_t object_handle, s16 resource_type_index);
+
+                object_t* m_objects;
+                alloc_t*  m_allocator;
+                s16       m_num_objects;
+                u16       m_max_objects;
+                s16       m_num_resources;
+                u16       m_max_resources;
             };
+        }  // namespace nobject_resources
 
-            void register_resource_pool(s16 type_index, u32 max_num_resources, u32 sizeof_resource);
+#define DEFINE_OBJECT_TYPE(T)                              \
+    namespace nobject_resources                            \
+    {                                                      \
+        static pool_t::object_type_t<T> s_object_type_##T; \
+    }
 
-            type_t*  m_types;
-            alloc_t* m_allocator;
-            s16      m_num_types;
-            u16      m_max_types;
-            u32      m_max_resources_per_type;
-        };
+#define DECLARE_OBJECT_TYPE(T) \
+    template <>                \
+    s8 nobject_resources::pool_t::object_type_t<T>::s_type_index = -1;
 
-        // Now we need a pool of resources where a resource is a specific type and can have additional 'components' that are also resources.
+#define DEFINE_OBJECT_RESOURCE_TYPE(T) static nobject_resources::pool_t::resource_type_t<T> s_orp_resource_type_##T
+#define DECLARE_OBJECT_RESOURCE_TYPE(T) \
+    template <>                         \
+    s8 nobject_resources::pool_t::resource_type_t<T>::s_type_index = -1;
 
     }  // namespace ngfx
 }  // namespace ncore

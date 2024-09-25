@@ -9,6 +9,13 @@ namespace ncore
 {
     namespace ngfx
     {
+        struct object_a_t
+        {
+            int   a;
+            int   b;
+            float c;
+        };
+
         struct resource_a_t
         {
             int   a;
@@ -37,8 +44,19 @@ namespace ncore
         DECLARE_RESOURCE(resource_a_t);
         DECLARE_RESOURCE(resource_b_t);
         DECLARE_RESOURCE(resource_c_t);
-    }
-}
+
+        DEFINE_OBJECT_TYPE(object_a_t);
+        DECLARE_OBJECT_TYPE(object_a_t);
+
+        DEFINE_OBJECT_RESOURCE_TYPE(resource_a_t);
+        DEFINE_OBJECT_RESOURCE_TYPE(resource_b_t);
+        DEFINE_OBJECT_RESOURCE_TYPE(resource_c_t);
+
+        DECLARE_OBJECT_RESOURCE_TYPE(resource_a_t);
+        DECLARE_OBJECT_RESOURCE_TYPE(resource_b_t);
+        DECLARE_OBJECT_RESOURCE_TYPE(resource_c_t);
+    }  // namespace ngfx
+}  // namespace ncore
 
 UNITTEST_SUITE_BEGIN(resource_pool)
 {
@@ -52,19 +70,19 @@ UNITTEST_SUITE_BEGIN(resource_pool)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            ngfx::object_pool_t pool;
+            ngfx::nobject::pool_t pool;
             pool.init(Allocator, 1024, 32);
             pool.shutdown(Allocator);
         }
 
         UNITTEST_TEST(obtain_release)
         {
-            ngfx::object_pool_t pool;
+            ngfx::nobject::pool_t pool;
             pool.init(Allocator, 1024, 32);
 
-            u32 r = pool.obtain();
+            u32 r = pool.alloc();
             CHECK_EQUAL(0, r);
-            pool.release(r);
+            pool.dealloc(r);
 
             pool.shutdown(Allocator);
         }
@@ -87,14 +105,14 @@ UNITTEST_SUITE_BEGIN(resource_pool)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            ngfx::resource_pool_t<myresource_t> pool;
+            ngfx::nobject::ntyped::pool_t<myresource_t> pool;
             pool.init(Allocator, 32);
             pool.shutdown();
         }
 
         UNITTEST_TEST(obtain_release)
         {
-            ngfx::resource_pool_t<myresource_t> pool;
+            ngfx::nobject::ntyped::pool_t<myresource_t> pool;
             pool.init(Allocator, 32);
 
             myresource_t* r1 = pool.obtain_access();
@@ -116,13 +134,12 @@ UNITTEST_SUITE_BEGIN(resource_pool)
             CHECK_EQUAL(5, r22->b);
             CHECK_EQUAL(6.28f, r22->c);
 
-            pool.release(0);
-            pool.release(1);
+            pool.dealloc(0);
+            pool.dealloc(1);
 
             pool.shutdown();
         }
     }
-
 
     // Test the resources pool
     UNITTEST_FIXTURE(resources)
@@ -134,23 +151,27 @@ UNITTEST_SUITE_BEGIN(resource_pool)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            ngfx::resources_pool_t pool;
+            ngfx::nresources::pool_t pool;
             pool.init(Allocator, 32, 4);
             pool.shutdown();
         }
 
         UNITTEST_TEST(register_resource_types)
         {
-            ngfx::resources_pool_t pool;
+            ngfx::nresources::pool_t pool;
             pool.init(Allocator, 32, 4);
 
-            ngfx::handle_t h1 = pool.register_resource<ngfx::resource_a_t>();
+            CHECK_TRUE(pool.register_resource<ngfx::resource_a_t>());
+            CHECK_TRUE(pool.register_resource<ngfx::resource_b_t>());
+            CHECK_TRUE(pool.register_resource<ngfx::resource_c_t>());
+
+            ngfx::handle_t h1 = pool.alloc_resource<ngfx::resource_a_t>();
             CHECK_EQUAL(0, h1.index);
             CHECK_EQUAL(0, h1.type);
-            ngfx::handle_t h2 = pool.register_resource<ngfx::resource_b_t>();
+            ngfx::handle_t h2 = pool.alloc_resource<ngfx::resource_b_t>();
             CHECK_EQUAL(0, h2.index);
             CHECK_EQUAL(1, h2.type);
-            ngfx::handle_t h3 = pool.register_resource<ngfx::resource_c_t>();
+            ngfx::handle_t h3 = pool.alloc_resource<ngfx::resource_c_t>();
             CHECK_EQUAL(0, h3.index);
             CHECK_EQUAL(2, h3.type);
 
@@ -166,9 +187,75 @@ UNITTEST_SUITE_BEGIN(resource_pool)
             CHECK_FALSE(pool.is_resource_type<ngfx::resource_a_t>(h3));
             CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h3));
 
-            pool.release_resource(h1);
-            pool.release_resource(h2);
-            pool.release_resource(h3);
+            pool.dealloc_resource(h1);
+            pool.dealloc_resource(h2);
+            pool.dealloc_resource(h3);
+
+            pool.shutdown();
+        }
+    }
+
+    // Test the object resources pool
+    UNITTEST_FIXTURE(object_resources)
+    {
+        UNITTEST_ALLOCATOR;
+
+        UNITTEST_FIXTURE_SETUP() {}
+        UNITTEST_FIXTURE_TEARDOWN() {}
+
+        UNITTEST_TEST(test_init_shutdown)
+        {
+            ngfx::nobject_resources::pool_t pool;
+            pool.init(Allocator, 32, 4);
+            pool.shutdown();
+        }
+
+        UNITTEST_TEST(register_object_and_resource_types)
+        {
+            ngfx::nobject_resources::pool_t pool;
+            pool.init(Allocator, 32, 4);
+
+            bool obj_a = pool.register_object_type<ngfx::object_a_t>(32);
+            CHECK_TRUE(obj_a);
+
+            bool obj_a_res_a = pool.register_resource_type<ngfx::object_a_t, ngfx::resource_a_t>(32);
+            CHECK_TRUE(obj_a_res_a);
+
+            bool obj_a_res_b = pool.register_resource_type<ngfx::object_a_t, ngfx::resource_b_t>(32);
+            CHECK_TRUE(obj_a_res_b);
+
+            bool obj_a_res_c = pool.register_resource_type<ngfx::object_a_t, ngfx::resource_c_t>(32);
+            CHECK_TRUE(obj_a_res_c);
+
+            ngfx::handle_t o1 = pool.alloc_object<ngfx::object_a_t>();
+            CHECK_EQUAL(0, o1.index);
+            CHECK_EQUAL(0, o1.type);
+
+            ngfx::handle_t h1 = pool.add_resource<ngfx::resource_a_t>(o1);
+            CHECK_EQUAL(0, h1.index);
+            CHECK_EQUAL(0, h1.type);
+            ngfx::handle_t h2 = pool.add_resource<ngfx::resource_b_t>(o1);
+            CHECK_EQUAL(0, h2.index);
+            CHECK_EQUAL(1, h2.type);
+            ngfx::handle_t h3 = pool.add_resource<ngfx::resource_c_t>(o1);
+            CHECK_EQUAL(0, h3.index);
+            CHECK_EQUAL(2, h3.type);
+
+            CHECK_TRUE(pool.is_resource_type<ngfx::resource_a_t>(h1));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h1));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_c_t>(h1));
+
+            CHECK_TRUE(pool.is_resource_type<ngfx::resource_b_t>(h2));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_a_t>(h2));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_c_t>(h2));
+
+            CHECK_TRUE(pool.is_resource_type<ngfx::resource_c_t>(h3));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_a_t>(h3));
+            CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h3));
+
+            pool.dealloc_resource(h1);
+            pool.dealloc_resource(h2);
+            pool.dealloc_resource(h3);
 
             pool.shutdown();
         }
