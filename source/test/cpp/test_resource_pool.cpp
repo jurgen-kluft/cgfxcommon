@@ -228,34 +228,36 @@ UNITTEST_SUITE_BEGIN(resource_pool)
             CHECK_TRUE(obj_a_res_c);
 
             ngfx::handle_t o1 = pool.alloc_object<ngfx::object_a_t>();
-            CHECK_EQUAL(0, o1.index);
-            CHECK_EQUAL(0, o1.type);
+            CHECK_EQUAL(0, o1.index & 0x0FFFFFFF);
+            CHECK_EQUAL(0xFFFF, o1.type);
 
             ngfx::handle_t h1 = pool.add_resource<ngfx::resource_a_t>(o1);
-            CHECK_EQUAL(0, h1.index);
+            CHECK_EQUAL(0, h1.index & 0x00FFFFFF);
             CHECK_EQUAL(0, h1.type);
             ngfx::handle_t h2 = pool.add_resource<ngfx::resource_b_t>(o1);
-            CHECK_EQUAL(0, h2.index);
+            CHECK_EQUAL(0, h2.index & 0x00FFFFFF);
             CHECK_EQUAL(1, h2.type);
             ngfx::handle_t h3 = pool.add_resource<ngfx::resource_c_t>(o1);
-            CHECK_EQUAL(0, h3.index);
+            CHECK_EQUAL(0, h3.index & 0x00FFFFFF);
             CHECK_EQUAL(2, h3.type);
 
-            CHECK_TRUE(pool.is_resource_type<ngfx::resource_a_t>(h1));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h1));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_c_t>(h1));
+            CHECK_TRUE(pool.is_resource<ngfx::resource_a_t>(h1));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_b_t>(h1));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_c_t>(h1));
 
-            CHECK_TRUE(pool.is_resource_type<ngfx::resource_b_t>(h2));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_a_t>(h2));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_c_t>(h2));
+            CHECK_TRUE(pool.is_resource<ngfx::resource_b_t>(h2));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_a_t>(h2));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_c_t>(h2));
 
-            CHECK_TRUE(pool.is_resource_type<ngfx::resource_c_t>(h3));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_a_t>(h3));
-            CHECK_FALSE(pool.is_resource_type<ngfx::resource_b_t>(h3));
+            CHECK_TRUE(pool.is_resource<ngfx::resource_c_t>(h3));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_a_t>(h3));
+            CHECK_FALSE(pool.is_resource<ngfx::resource_b_t>(h3));
 
             pool.dealloc_resource(h1);
             pool.dealloc_resource(h2);
             pool.dealloc_resource(h3);
+
+            pool.dealloc_object(o1);
 
             pool.shutdown();
         }

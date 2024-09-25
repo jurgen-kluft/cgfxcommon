@@ -177,22 +177,25 @@ namespace ncore
 
             void pool_t::init(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types)
             {
-                m_allocator     = allocator;
-                m_objects       = (object_t*)allocator->allocate(max_num_object_types * sizeof(object_t));
-                m_num_objects   = 0;
-                m_max_objects   = max_num_object_types;
-                m_num_resources = 0;
-                m_max_resources = max_num_resource_types;
+                m_allocator          = allocator;
+                m_objects            = (object_t*)allocator->allocate(max_num_object_types * sizeof(object_t));
+                m_num_object_types   = 0;
+                m_max_object_types   = max_num_object_types;
+                m_num_resource_types = 0;
+                m_max_resource_types = max_num_resource_types;
             }
 
             void pool_t::shutdown()
             {
-                for (u32 i = 0; i < m_num_objects; i++)
+                for (u32 i = 0; i < m_num_object_types; i++)
                 {
-                    for (u32 j = 0; j < m_num_resources; j++)
+                    for (u32 j = 0; j < m_num_resource_types; j++)
                     {
                         if (m_objects[i].m_a_resources[j] != nullptr)
+                        {
                             m_objects[i].m_a_resources[j]->shutdown(m_allocator);
+                            m_allocator->deallocate(m_objects[i].m_a_resources[j]);
+                        }
                     }
                     m_allocator->deallocate(m_objects[i].m_a_resources);
 
@@ -204,47 +207,70 @@ namespace ncore
 
             void* pool_t::get_access(handle_t handle)
             {
-                // Implement
+                if (is_handle_an_object(handle))
+                {
+                    const u16 object_type_index = get_object_type_index(handle);
+                    const u32 object_index      = get_object_index(handle);
+                    return m_objects[object_type_index].m_object_pool->get_access(object_index);
+                }
+                else if (is_handle_a_resource(handle))
+                {
+                    const u16 object_type_index   = get_object_type_index(handle);
+                    const u16 resource_type_index = get_resource_type_index(handle);
+                    const u32 resource_index      = get_resource_index(handle);
+                    return m_objects[object_type_index].m_a_resources[resource_type_index]->get_access(resource_index);
+                }
                 return nullptr;
             }
 
             const void* pool_t::get_access(handle_t handle) const
             {
-                // Implement
+                if (is_handle_an_object(handle))
+                {
+                    const u16 object_type_index = get_object_type_index(handle);
+                    const u32 object_index      = get_object_index(handle);
+                    return m_objects[object_type_index].m_object_pool->get_access(object_index);
+                }
+                else if (is_handle_a_resource(handle))
+                {
+                    const u16 object_type_index   = get_object_type_index(handle);
+                    const u16 resource_type_index = get_resource_type_index(handle);
+                    const u32 resource_index      = get_resource_index(handle);
+                    return m_objects[object_type_index].m_a_resources[resource_type_index]->get_access(resource_index);
+                }
                 return nullptr;
             }
 
-            void pool_t::register_object_type(s16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_resources)
+            void pool_t::register_object_type(u16 object_type_index, u32 max_num_objects, u32 sizeof_object, u32 max_num_resources)
             {
-                ASSERT(object_type_index < m_max_objects);
+                ASSERT(object_type_index < m_max_object_types);
                 m_objects[object_type_index].m_object_pool = m_allocator->construct<nobject::pool_t>();
                 m_objects[object_type_index].m_object_pool->init(m_allocator, max_num_objects, sizeof_object);
                 m_objects[object_type_index].m_a_resources = (nobject::pool_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::pool_t*));
             }
 
-            void pool_t::register_resource_type(s16 object_type_index, s16 resource_type_index, u32 max_num_resources, u32 sizeof_resource)
+            void pool_t::register_resource_type(u16 object_type_index, u16 resource_type_index, u32 max_num_resources, u32 sizeof_resource)
             {
-                ASSERT(object_type_index < m_max_objects);
-                ASSERT(resource_type_index < m_max_resources);
+                ASSERT(object_type_index < m_max_object_types);
+                ASSERT(resource_type_index < m_max_resource_types);
                 m_objects[object_type_index].m_a_resources[resource_type_index] = m_allocator->construct<nobject::pool_t>();
                 m_objects[object_type_index].m_a_resources[resource_type_index]->init(m_allocator, max_num_resources, sizeof_resource);
             }
 
-            handle_t pool_t::alloc_object(s16 object_type_index)
+            handle_t pool_t::alloc_object(u16 object_type_index)
             {
-                ASSERT(object_type_index < m_max_objects);
-                const u32 index = m_objects[object_type_index].m_object_pool->alloc();
-                handle_t handle = {index, object_type_index};
-                return handle;
+                ASSERT(object_type_index < m_max_object_types);
+                const u32 object_index = m_objects[object_type_index].m_object_pool->alloc();
+                return make_object_handle(object_type_index, object_index);
             }
 
-            handle_t pool_t::alloc_resource(handle_t object_handle, s16 resource_type_index)
+            handle_t pool_t::alloc_resource(handle_t object_handle, u16 resource_type_index)
             {
-                ASSERT(object_handle.type < m_max_objects);
-                ASSERT(resource_type_index < m_max_resources);
-                const u32 index = m_objects[object_handle.type].m_a_resources[resource_type_index]->alloc();
-                handle_t handle = {index, resource_type_index};
-                return handle;
+                const u16 object_type_index = get_object_type_index(object_handle);
+                ASSERT(object_type_index < m_max_object_types);
+                ASSERT(resource_type_index < m_max_resource_types);
+                const u32 resource_index = m_objects[object_type_index].m_a_resources[resource_type_index]->alloc();
+                return make_resource_handle(object_type_index, resource_type_index, resource_index);
             }
 
         }  // namespace nobject_resources
