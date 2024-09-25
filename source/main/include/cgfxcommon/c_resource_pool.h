@@ -50,16 +50,16 @@ namespace ncore
                 void deallocate(u32 index);
                 void free_all();
 
-                template<typename T>
+                template <typename T>
                 u32 construct()
                 {
                     const u32 index = allocate();
-                    void* ptr = get_access(index);
+                    void*     ptr   = get_access(index);
                     new (signature_t(), ptr) T();
                     return index;
                 }
 
-                template<typename T>
+                template <typename T>
                 void destruct(u32 index)
                 {
                     void* ptr = get_access(index);
@@ -87,6 +87,9 @@ namespace ncore
 
                     u32  allocate();
                     void deallocate(u32 index);
+
+                    u32  construct();
+                    void destruct(u32 index);
 
                     T*       get_access(u32 index);
                     const T* get_access(u32 index) const;
@@ -118,13 +121,26 @@ namespace ncore
                 inline u32 pool_t<T>::allocate()
                 {
                     const u32 index = m_object_pool.allocate();
+                    return index;
+                }
+
+                template <typename T>
+                inline void pool_t<T>::deallocate(u32 index)
+                {
+                    m_object_pool.deallocate(index);
+                }
+
+                template <typename T>
+                inline u32 pool_t<T>::construct()
+                {
+                    const u32 index = m_object_pool.allocate();
                     void*     ptr   = m_object_pool.get_access(index);
                     new (signature_t(), ptr) T();
                     return index;
                 }
 
                 template <typename T>
-                inline void pool_t<T>::deallocate(u32 index)
+                inline void pool_t<T>::destruct(u32 index)
                 {
                     void* ptr = m_object_pool.get_access(index);
                     ((T*)ptr)->~T();
@@ -204,13 +220,31 @@ namespace ncore
                         return c_invalid_handle;
 
                     u32 const index = m_types[resource_type_t<T>::s_type_index].m_resource_pool->allocate();
+                    return make_handle(resource_type_t<T>::s_type_index, index);
+                }
+
+                void deallocate(handle_t handle)
+                {
+                    const u32 type_index = handle.type;
+                    const u32 res_index  = handle.index;
+                    void*     ptr        = m_types[type_index].m_resource_pool->get_access(res_index);
+                    m_types[type_index].m_resource_pool->deallocate(res_index);
+                }
+
+                template <typename T>
+                handle_t construct()
+                {
+                    if (resource_type_t<T>::s_type_index < 0)
+                        return c_invalid_handle;
+
+                    u32 const index = m_types[resource_type_t<T>::s_type_index].m_resource_pool->allocate();
                     void*     ptr   = m_types[resource_type_t<T>::s_type_index].m_resource_pool->get_access(index);
                     new (signature_t(), ptr) T();
                     return make_handle(resource_type_t<T>::s_type_index, index);
                 }
 
                 template <typename T>
-                void deallocate(handle_t handle)
+                void destruct(handle_t handle)
                 {
                     const u32 type_index = handle.type;
                     const u32 res_index  = handle.index;
@@ -246,14 +280,14 @@ namespace ncore
                 u16      m_max_types;
             };
 
-#define DEFINE_RESOURCE_TYPE(T)                                     \
+#define DEFINE_RESOURCE_TYPE(T)                                \
     namespace nresources                                       \
     {                                                          \
         static pool_t::resource_type_t<T> s_resource_type_##T; \
     }
 
 #define DECLARE_RESOURCE_TYPE(T) \
-    template <>             \
+    template <>                  \
     s16 nresources::pool_t::resource_type_t<T>::s_type_index = -1;
 
         }  // namespace nresources
@@ -368,14 +402,14 @@ namespace ncore
                     const u32 object_type_index = get_object_type_index(handle);
                     ASSERT(object_type_index < m_num_object_types);
                     const u32 object_index = get_object_index(handle);
-                    void* ptr = m_objects[object_type_index].m_object_pool->get_access(object_index);
+                    void*     ptr          = m_objects[object_type_index].m_object_pool->get_access(object_index);
                     ((T*)ptr)->~T();
                     m_objects[object_type_index].m_object_pool->deallocate(object_index);
                 }
 
                 // Add a 'resource' to an 'object'
                 template <typename T>
-                handle_t add_resource(handle_t object_handle)
+                handle_t allocate_resource(handle_t object_handle)
                 {
                     if (resource_type_t<T>::s_type_index == 0xFFFF)
                         return c_invalid_handle;
