@@ -39,6 +39,55 @@ namespace ncore
                 const void* get_access(u32 index) const;
             };
 
+            // An inventory is using array_t but it has an additional bit array to mark if an item is used or free.
+            struct inventory_t
+            {
+                inventory_t();
+
+                void init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource);
+                void shutdown(alloc_t* allocator);
+
+                inline void allocate(u32 index)
+                {
+                    ASSERT(is_free(index));
+                    set_used(index);
+                }
+
+                inline void deallocate(u32 index)
+                {
+                    ASSERT(is_used(index));
+                    set_free(index);
+                }
+
+                void free_all();
+
+                template <typename T>
+                void construct(u32 index)
+                {
+                    allocate(index);
+                    void* ptr = get_access(index);
+                    new (signature_t(), ptr) T();
+                }
+
+                template <typename T>
+                void destruct(u32 index)
+                {
+                    deallocate(index);
+                    void* ptr = get_access(index);
+                    ((T*)ptr)->~T();
+                }
+
+                inline bool        is_free(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) == 0; }
+                inline bool        is_used(u32 index) const { return (m_bitarray[index >> 5] & (1 << (index & 31))) != 0; }
+                inline void        set_free(u32 index) { m_bitarray[index >> 5] &= ~(1 << (index & 31)); }
+                inline void        set_used(u32 index) { m_bitarray[index >> 5] |= (1 << (index & 31)); }
+                inline void*       get_access(u32 index) { return m_array.get_access(index); }
+                inline const void* get_access(u32 index) const { return m_array.get_access(index); }
+
+                u32*    m_bitarray;
+                array_t m_array;
+            };
+
             struct pool_t
             {
                 pool_t();
@@ -292,13 +341,12 @@ namespace ncore
 
         }  // namespace nresources
 
-        namespace nobject_resources
+        namespace nobjects_with_resources
         {
             // Limitations:
             // - 1024 object types
             // - 1024 resource types
             // - 256 million objects (2^28)
-
             struct pool_t
             {
                 template <typename T>
@@ -411,20 +459,33 @@ namespace ncore
                 template <typename T>
                 handle_t allocate_resource(handle_t object_handle)
                 {
-                    if (resource_type_t<T>::s_type_index == 0xFFFF)
+                    const u16 resource_type_index = resource_type_t<T>::s_type_index;
+                    if (resource_type_index == 0xFFFF)
                         return c_invalid_handle;
-                    return allocate_resource(object_handle, resource_type_t<T>::s_type_index);
+                    const u32 object_type_index = get_object_type_index(object_handle);
+                    const u32 object_index      = get_object_index(object_handle);
+                    if (m_objects[object_type_index].m_a_resources[resource_type_index] != nullptr)
+                    {
+                        m_objects[object_type_index].m_a_resources[resource_type_index]->allocate(object_index);
+                        return make_resource_handle(get_object_type_index(object_handle), resource_type_index, object_index);
+                    }
+                    return c_invalid_handle;
                 }
 
                 template <typename T>
                 handle_t construct_resource(handle_t object_handle)
                 {
-                    if (resource_type_t<T>::s_type_index == 0xFFFF)
+                    const u16 resource_type_index = resource_type_t<T>::s_type_index;
+                    if (resource_type_index == 0xFFFF)
                         return c_invalid_handle;
-                    handle_t handle = allocate_resource(object_handle, resource_type_t<T>::s_type_index);
-                    void*    ptr    = get_access(handle);
-                    new (signature_t(), ptr) T();
-                    return handle;
+                    const u32 object_type_index = get_object_type_index(object_handle);
+                    const u32 object_index      = get_object_index(object_handle);
+                    if (m_objects[object_type_index].m_a_resources[resource_type_index] != nullptr)
+                    {
+                        m_objects[object_type_index].m_a_resources[resource_type_index]->construct<T>(object_index);
+                        return make_resource_handle(get_object_type_index(object_handle), resource_type_index, object_index);
+                    }
+                    return c_invalid_handle;
                 }
 
                 template <typename T>
@@ -451,17 +512,20 @@ namespace ncore
                     const u32 resource_index      = get_resource_index(handle);
                     ASSERT(object_type_index < m_num_object_types);
                     ASSERT(resource_type_index < m_num_resource_types);
-                    void* ptr = m_objects[object_type_index].m_a_resources[resource_type_index]->get_access(resource_index);
-                    ((T*)ptr)->~T();
-                    m_objects[object_type_index].m_a_resources[resource_type_index]->deallocate(resource_index);
+                    m_objects[object_type_index].m_a_resources[resource_type_index]->destruct<T>(resource_index);
                 }
 
                 template <typename T>
                 bool has_resource(handle_t object_handle) const
                 {
+                    const u16 resource_type_index = resource_type_t<T>::s_type_index;
+                    if (resource_type_index == 0xFFFF)
+                        return false;
                     const u32 object_type_index = get_object_type_index(object_handle);
                     ASSERT(object_type_index < m_num_object_types);
-                    return m_objects[object_type_index].m_a_resources[resource_type_t<T>::s_type_index] != nullptr;
+                    if (m_objects[object_type_index].m_a_resources[resource_type_index] != nullptr)
+                        return m_objects[object_type_index].m_a_resources[resource_type_index]->is_used(get_object_index(object_handle));
+                    return false;
                 }
 
                 static const handle_t c_invalid_handle;
@@ -469,8 +533,8 @@ namespace ncore
             private:
                 struct object_t
                 {
-                    nobject::pool_t*  m_object_pool;
-                    nobject::pool_t** m_a_resources;  // m_a_resources[m_max_resources]
+                    nobject::pool_t*       m_object_pool;
+                    nobject::inventory_t** m_a_resources;  // m_a_resources[m_max_resources]
                 };
 
                 const u32 c_object_type   = 1;
@@ -516,21 +580,21 @@ namespace ncore
             };
 
 #define DEFINE_OBJECT_TYPE(T)                              \
-    namespace nobject_resources                            \
+    namespace nobjects_with_resources                      \
     {                                                      \
         static pool_t::object_type_t<T> s_object_type_##T; \
     }
 
 #define DECLARE_OBJECT_TYPE(T) \
     template <>                \
-    u16 nobject_resources::pool_t::object_type_t<T>::s_type_index = 0xFFFF;
+    u16 nobjects_with_resources::pool_t::object_type_t<T>::s_type_index = 0xFFFF;
 
-#define DEFINE_OBJECT_RESOURCE_TYPE(T) static nobject_resources::pool_t::resource_type_t<T> s_orp_resource_type_##T
+#define DEFINE_OBJECT_RESOURCE_TYPE(T) static nobjects_with_resources::pool_t::resource_type_t<T> s_orp_resource_type_##T
 #define DECLARE_OBJECT_RESOURCE_TYPE(T) \
     template <>                         \
-    u16 nobject_resources::pool_t::resource_type_t<T>::s_type_index = 0xFFFF;
+    u16 nobjects_with_resources::pool_t::resource_type_t<T>::s_type_index = 0xFFFF;
 
-        }  // namespace nobject_resources
+        }  // namespace nobjects_with_resources
 
     }  // namespace ngfx
 }  // namespace ncore

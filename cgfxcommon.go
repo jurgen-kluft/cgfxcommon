@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/jurgen-kluft/ccode"
+	"github.com/jurgen-kluft/ccode/ccode-base"
 	c "github.com/jurgen-kluft/cgfxcommon/package"
 )
 

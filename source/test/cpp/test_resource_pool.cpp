@@ -210,14 +210,14 @@ UNITTEST_SUITE_BEGIN(resource_pool)
 
         UNITTEST_TEST(test_init_shutdown)
         {
-            ngfx::nobject_resources::pool_t pool;
+            ngfx::nobjects_with_resources::pool_t pool;
             pool.init(Allocator, 32, 4);
             pool.shutdown();
         }
 
         UNITTEST_TEST(register_object_and_resource_types)
         {
-            ngfx::nobject_resources::pool_t pool;
+            ngfx::nobjects_with_resources::pool_t pool;
             pool.init(Allocator, 32, 4);
 
             bool obj_a = pool.register_object_type<ngfx::object_a_t>(32);

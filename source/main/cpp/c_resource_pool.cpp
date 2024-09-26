@@ -1,5 +1,6 @@
 #include "cbase/c_allocator.h"
 #include "cbase/c_integer.h"
+#include "cbase/c_memory.h"
 #include "cgfxcommon/c_resource_pool.h"
 
 namespace ncore
@@ -37,6 +38,34 @@ namespace ncore
 
             const void* array_t::get_access(u32 index) const { return &m_memory[index * m_sizeof]; }
 
+            // ------------------------------------------------------------------------------------------------
+
+            inventory_t::inventory_t()
+                : m_bitarray(nullptr)
+                , m_array()
+            {
+            }
+
+            void inventory_t::init(alloc_t* allocator, u32 max_num_resources, u32 sizeof_resource)
+            {
+                m_array.init(allocator, max_num_resources, sizeof_resource);
+                m_bitarray = (u32*)g_allocate_and_clear(allocator, ((max_num_resources + 31) / 32) * sizeof(u32));
+            }
+
+            void inventory_t::shutdown(alloc_t* allocator)
+            {
+                m_array.shutdown(allocator);
+                allocator->deallocate(m_bitarray);
+            }
+
+            void inventory_t::free_all()
+            {
+                m_array.m_num_used = 0;
+                nmem::memset(m_bitarray, 0, ((m_array.m_num_max + 31) / 32) * sizeof(u32));
+            }
+
+
+            // ------------------------------------------------------------------------------------------------
             pool_t::pool_t()
                 : m_object_array()
                 , m_free_resource_index(0)
@@ -134,10 +163,10 @@ namespace ncore
 
             void pool_t::init(alloc_t* allocator, u16 max_types)
             {
-                m_allocator              = allocator;
-                m_num_types              = 0;
-                m_max_types              = max_types;
-                m_types                  = (type_t*)allocator->allocate(max_types * sizeof(type_t));
+                m_allocator = allocator;
+                m_num_types = 0;
+                m_max_types = max_types;
+                m_types     = (type_t*)allocator->allocate(max_types * sizeof(type_t));
             }
 
             void pool_t::shutdown()
@@ -170,7 +199,7 @@ namespace ncore
             }
         }  // namespace nresources
 
-        namespace nobject_resources
+        namespace nobjects_with_resources
         {
             const handle_t pool_t::c_invalid_handle = {0xFFFFFFFF, 0xFFFFFFFF};
 
@@ -245,15 +274,15 @@ namespace ncore
                 ASSERT(object_type_index < m_max_object_types);
                 m_objects[object_type_index].m_object_pool = m_allocator->construct<nobject::pool_t>();
                 m_objects[object_type_index].m_object_pool->init(m_allocator, max_num_objects, sizeof_object);
-                m_objects[object_type_index].m_a_resources = (nobject::pool_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::pool_t*));
+                m_objects[object_type_index].m_a_resources = (nobject::inventory_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::inventory_t*));
             }
 
             void pool_t::register_resource_type(u16 object_type_index, u16 resource_type_index, u32 sizeof_resource)
             {
                 ASSERT(object_type_index < m_max_object_types);
                 ASSERT(resource_type_index < m_max_resource_types);
-                const u32 max_num_resources = m_objects[object_type_index].m_object_pool->m_object_array.m_num_max;
-                m_objects[object_type_index].m_a_resources[resource_type_index] = m_allocator->construct<nobject::pool_t>();
+                const u32 max_num_resources                                     = m_objects[object_type_index].m_object_pool->m_object_array.m_num_max;
+                m_objects[object_type_index].m_a_resources[resource_type_index] = m_allocator->construct<nobject::inventory_t>();
                 m_objects[object_type_index].m_a_resources[resource_type_index]->init(m_allocator, max_num_resources, sizeof_resource);
             }
 
@@ -266,13 +295,14 @@ namespace ncore
 
             handle_t pool_t::allocate_resource(handle_t object_handle, u16 resource_type_index)
             {
+                const u32 object_index = get_object_index(object_handle);
                 const u16 object_type_index = get_object_type_index(object_handle);
                 ASSERT(object_type_index < m_max_object_types);
                 ASSERT(resource_type_index < m_max_resource_types);
-                const u32 resource_index = m_objects[object_type_index].m_a_resources[resource_type_index]->allocate();
-                return make_resource_handle(object_type_index, resource_type_index, resource_index);
+                m_objects[object_type_index].m_a_resources[resource_type_index]->allocate(object_index);
+                return make_resource_handle(object_type_index, resource_type_index, object_index);
             }
 
-        }  // namespace nobject_resources
+        }  // namespace nobjects_with_resources
     }  // namespace ngfx
 }  // namespace ncore

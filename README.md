@@ -98,14 +98,16 @@ pool.register_object_type<myobject_a_t>(32); // maximum 32 objects of type myobj
 pool.register_resource_type<myobject_a_t, myresource_a_t>(); 
 pool.register_resource_type<myobject_a_t, myresource_b_t>(); 
 
-ngfx::handle_t handle_a = pool.allocate<myobject_a_t>();
-ngfx::handle_t handle_a_resource_a = pool.add_resource<myresource_a_t>(handle_a);
-ngfx::handle_t handle_a_resource_b = pool.add_resource<myresource_b_t>(handle_a);
+ngfx::handle_t handle_a = pool.allocate_object<myobject_a_t>();
+ngfx::handle_t handle_a_resource_a = pool.allocate_resource<myresource_a_t>(handle_a);
+ngfx::handle_t handle_a_resource_b = pool.allocate_resource<myresource_b_t>(handle_a);
 
 myobject_a_t* object_a = pool.get_access<myobject_a_t>(handle_a);
 myresource_a_t* resource_a = pool.get_access<myresource_a_t>(handle_a_resource_a);
 myresource_b_t* resource_b = pool.get_access<myresource_b_t>(handle_a_resource_b);
 
-pool.
+pool.deallocate_resource<myresource_a_t>(handle_a_resource_a);
+pool.deallocate_resource<myresource_b_t>(handle_a_resource_b);
 
+pool.deallocate_object<myobject_a_t>(handle_a);
 ```
