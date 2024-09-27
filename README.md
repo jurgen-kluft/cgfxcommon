@@ -88,7 +88,7 @@ pool.teardown();
 
 ## objects with resources pool
 
-An pool managing objects where an object can have multiple resources associated/attached with/to it.
+An pool managing objects where an object can have multiple resources associated/attached with/to it, and an object also supports up to 192 `tags`.
 
 ```c++
 enum EObjectTypes
@@ -100,6 +100,12 @@ enum EResourceTypes
 {
     kResourceA = 0,
     kResourceB = 1,
+};
+
+enum ETagTypes
+{
+    kTagA = 0,
+    kTagB = 1,
 };
 
 struct myobject_a_t {
@@ -117,6 +123,14 @@ struct myresource_b_t {
     u32 data;
 };
 
+struct mytag_a_t {
+    DECLARE_OBJECT_TAG_TYPE(kTagA); // Indices are managed by user
+};
+
+struct mytag_b_t {
+    DECLARE_OBJECT_TAG_TYPE(kTagB); // Indices are managed by user
+};
+
 ngfx::nobject_resources::pool_t pool;
 pool.setup(allocator, 10, 10); // maximum 10 object types and 10 resource types
 
@@ -128,9 +142,15 @@ ngfx::handle_t handle_a = pool.allocate_object<myobject_a_t>();
 ngfx::handle_t handle_a_resource_a = pool.allocate_resource<myresource_a_t>(handle_a);
 ngfx::handle_t handle_a_resource_b = pool.allocate_resource<myresource_b_t>(handle_a);
 
+pool.add_tag<mytag_a_t>(handle_a);
+pool.add_tag<mytag_b_t>(handle_a);
+
 myobject_a_t* object_a = pool.get_access<myobject_a_t>(handle_a);
 myresource_a_t* resource_a = pool.get_access<myresource_a_t>(handle_a_resource_a);
 myresource_b_t* resource_b = pool.get_access<myresource_b_t>(handle_a_resource_b);
+
+pool.rem_tag<mytag_a_t>(handle_a);
+pool.rem_tag<mytag_b_t>(handle_a);
 
 pool.deallocate_resource<myresource_a_t>(handle_a_resource_a);
 pool.deallocate_resource<myresource_b_t>(handle_a_resource_b);

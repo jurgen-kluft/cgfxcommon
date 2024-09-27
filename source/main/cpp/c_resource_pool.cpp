@@ -157,7 +157,7 @@ namespace ncore
                 m_allocator          = allocator;
                 m_objects            = (object_t*)g_allocate_and_clear(allocator, max_num_object_types * sizeof(object_t));
                 m_max_object_types   = max_num_object_types;
-                m_max_resource_types = max_num_resource_types + 1; // +1 for object
+                m_max_resource_types = max_num_resource_types + 1;  // +1 for object
             }
 
             void pool_t::teardown()
@@ -174,6 +174,7 @@ namespace ncore
                                 m_allocator->deallocate(m_objects[i].m_a_resources[j]);
                             }
                         }
+                        m_allocator->deallocate(m_objects[i].m_a_tags);
                         m_allocator->deallocate(m_objects[i].m_a_resources);
                         m_objects[i].m_object_map.release(m_allocator);
                     }
@@ -188,7 +189,8 @@ namespace ncore
                 {
                     ASSERT(object_type_index < m_max_object_types);
                     m_objects[object_type_index].m_object_map.init_all_free(max_num_objects, m_allocator);
-                    m_objects[object_type_index].m_a_resources = (nobject::inventory_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::inventory_t*));
+                    m_objects[object_type_index].m_a_tags         = (tags_t*)g_allocate_and_clear(m_allocator, max_num_objects * sizeof(tags_t));
+                    m_objects[object_type_index].m_a_resources    = (nobject::inventory_t**)g_allocate_and_clear(m_allocator, max_num_resources * sizeof(nobject::inventory_t*));
                     m_objects[object_type_index].m_a_resources[0] = m_allocator->construct<nobject::inventory_t>();
                     m_objects[object_type_index].m_a_resources[0]->setup(m_allocator, max_num_objects, sizeof_object);
                     return true;

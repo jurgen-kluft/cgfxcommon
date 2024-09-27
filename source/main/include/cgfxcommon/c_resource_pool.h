@@ -310,9 +310,10 @@ namespace ncore
         namespace nobjects_with_resources
         {
             // Limitations:
-            // - 1024 object types
-            // - 1024 resource types
-            // - 256 million objects (2^28)
+            // - max 1024 object types (0 to 1023)
+            // - max 1024 resource types (0 to 1023)
+            // - max 64 tag types (0 to 63)
+            // - 2 billion objects (2^31)
             struct pool_t
             {
                 void setup(alloc_t* allocator, u32 max_num_object_types, u32 max_num_resource_types);
@@ -447,6 +448,38 @@ namespace ncore
                     return m_objects[object_type_index].m_a_resources[resource_type_index + 1]->is_used(get_object_index(object_handle));
                 }
 
+                // Tags
+                template <typename T>
+                void add_tag(handle_t object_handle)
+                {
+                    const u16 tag_type_index    = T::s_tag_type_index;
+                    const u32 object_type_index = get_object_type_index(object_handle);
+                    const u32 object_index      = get_object_index(object_handle);
+                    ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
+                    m_objects[object_type_index].m_a_tags[object_index].add_tag(tag_type_index);
+                }
+
+                template <typename T>
+                void rem_tag(handle_t object_handle)
+                {
+                    const u16 tag_type_index    = T::s_tag_type_index;
+                    const u32 object_type_index = get_object_type_index(object_handle);
+                    const u32 object_index      = get_object_index(object_handle);
+                    ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
+                    m_objects[object_type_index].m_a_tags[object_index].rem_tag(tag_type_index);
+                }
+
+                template <typename T>
+                bool has_tag(handle_t object_handle) const
+                {
+                    ASSERT(is_handle_an_object(object_handle));
+                    const u16 tag_type_index    = T::s_tag_type_index;
+                    const u32 object_type_index = get_object_type_index(object_handle);
+                    const u32 object_index      = get_object_index(object_handle);
+                    ASSERT(m_objects[object_type_index].m_a_tags != nullptr);
+                    return m_objects[object_type_index].m_a_tags[object_index].has_tag(tag_type_index);
+                }
+
                 static const handle_t c_invalid_handle;
 
             private:
@@ -497,10 +530,19 @@ namespace ncore
                     return m_objects[object_type_index].m_a_resources[resource_type_index]->get_access(index);
                 }
 
+                struct tags_t
+                {
+                    inline bool has_tag(u16 tag_type_index) const { return m_a_tags[tag_type_index >> 6] & (1 << (tag_type_index & 63)); }
+                    inline void add_tag(u16 tag_type_index) { m_a_tags[tag_type_index >> 6] |= (1 << (tag_type_index & 63)); }
+                    inline void rem_tag(u16 tag_type_index) { m_a_tags[tag_type_index >> 6] &= ~(1 << (tag_type_index & 63)); }
+                    u64 m_a_tags[3];
+                };
+
                 struct object_t
                 {
                     binmap_t               m_object_map;
                     nobject::inventory_t** m_a_resources;  // m_a_resources[m_max_resources], first inventory_t is for object
+                    tags_t*                m_a_tags;
                 };
 
                 object_t* m_objects;
@@ -511,6 +553,7 @@ namespace ncore
 
 #define DECLARE_OBJECT_TYPE(N)   static const u16 s_object_type_index = N;
 #define DECLARE_RESOURCE_TYPE(N) static const u16 s_resource_type_index = N;
+#define DECLARE_TAG_TYPE(N)      static const u16 s_tag_type_index = N;
 
         }  // namespace nobjects_with_resources
 

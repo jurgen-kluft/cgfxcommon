@@ -22,6 +22,12 @@ namespace ncore
             kResourceC = 2,
         };
 
+        enum ETagTypes
+        {
+            kTagA = 0,
+            kTagB = 1,
+        };
+
         struct object_a_t
         {
             DECLARE_OBJECT_TYPE(kObjectA);
@@ -60,6 +66,17 @@ namespace ncore
             int   a;
             int   b;
             float c;
+        };
+
+
+        struct tag_a_t
+        {
+            DECLARE_TAG_TYPE(kTagA);
+        };
+
+        struct tag_b_t
+        {
+            DECLARE_TAG_TYPE(kTagB);
         };
 
     }  // namespace ngfx
@@ -287,6 +304,30 @@ UNITTEST_SUITE_BEGIN(resource_pool)
             CHECK_TRUE(pool.is_resource<ngfx::resource_c_t>(h3));
             CHECK_FALSE(pool.is_resource<ngfx::resource_a_t>(h3));
             CHECK_FALSE(pool.is_resource<ngfx::resource_b_t>(h3));
+
+            pool.add_tag<ngfx::tag_a_t>(oa1);
+            pool.add_tag<ngfx::tag_b_t>(oa1);
+            pool.add_tag<ngfx::tag_b_t>(oa2);
+            pool.add_tag<ngfx::tag_a_t>(ob1);
+
+            CHECK_TRUE(pool.has_tag<ngfx::tag_a_t>(oa1));
+            CHECK_TRUE(pool.has_tag<ngfx::tag_b_t>(oa1));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_a_t>(oa2));
+            CHECK_TRUE(pool.has_tag<ngfx::tag_b_t>(oa2));
+            CHECK_TRUE(pool.has_tag<ngfx::tag_a_t>(ob1));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_b_t>(ob1));
+
+            pool.rem_tag<ngfx::tag_a_t>(oa1);
+            pool.rem_tag<ngfx::tag_b_t>(oa1);
+            pool.rem_tag<ngfx::tag_b_t>(oa2);
+            pool.rem_tag<ngfx::tag_a_t>(ob1);
+
+            CHECK_FALSE(pool.has_tag<ngfx::tag_a_t>(oa1));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_b_t>(oa1));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_a_t>(oa2));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_b_t>(oa2));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_a_t>(ob1));
+            CHECK_FALSE(pool.has_tag<ngfx::tag_b_t>(ob1));
 
             pool.deallocate_resource(h1);
             pool.destruct_resource<ngfx::resource_b_t>(h2);
