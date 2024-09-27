@@ -96,16 +96,29 @@ UNITTEST_SUITE_BEGIN(test_resource_pool)
 
         ncore::ngfx::offset_allocator_t* allocator = nullptr;
 
-        UNITTEST_FIXTURE_SETUP() { allocator = Allocator->construct<ncore::ngfx::offset_allocator_t>(Allocator, 1024 * 1024 * 256); }
-        UNITTEST_FIXTURE_TEARDOWN() { Allocator->destruct(allocator); }
+        UNITTEST_FIXTURE_SETUP()
+        {
+            allocator = Allocator->construct<ncore::ngfx::offset_allocator_t>(Allocator, 1024 * 1024 * 256);
+            allocator->setup();
+        }
+
+        UNITTEST_FIXTURE_TEARDOWN()
+        {
+            allocator->teardown();
+            Allocator->destruct(allocator);
+        }
 
         UNITTEST_TEST(basic)
         {
             ncore::ngfx::offset_allocator_t alloc(Allocator, 1024 * 1024 * 256);
-            ncore::ngfx::allocation_t       a      = alloc.allocate(1337);
-            u32                             offset = a.offset;
+            alloc.setup();
+
+            ncore::ngfx::allocation_t a      = alloc.allocate(1337);
+            u32                       offset = a.offset;
             CHECK_EQUAL(0, offset);
             alloc.free(a);
+
+            alloc.teardown();
         }
 
         UNITTEST_TEST(allocate_simple)

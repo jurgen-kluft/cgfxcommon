@@ -48,6 +48,9 @@ namespace ncore
             offset_allocator_t(alloc_t* allocator, u32 size, u32 maxAllocs = 128 * 1024);
             offset_allocator_t(offset_allocator_t&& other);
             ~offset_allocator_t();
+
+            void setup();
+            void teardown();
             void reset();
 
             allocation_t          allocate(u32 size);

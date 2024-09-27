@@ -133,7 +133,6 @@ namespace ncore
             , m_freeOffset(maxAllocs - 1)
         {
             ASSERT(m_size < 0x80000000);  // Size must be less than 2^31
-            reset();
         }
 
         offset_allocator_t::offset_allocator_t(offset_allocator_t&& other)
@@ -163,6 +162,34 @@ namespace ncore
             other.m_usedBinsTop  = 0;
         }
 
+        void offset_allocator_t::setup()
+        {
+            m_nodes     = (node_t*)m_allocator->allocate(sizeof(node_t) * m_maxAllocs);
+            m_neighbors = (neighbor_t*)m_allocator->allocate(sizeof(neighbor_t) * m_maxAllocs);
+            m_used      = (u32*)m_allocator->allocate((m_maxAllocs >> 5) * sizeof(u32));
+
+            reset();
+        }
+
+        void offset_allocator_t::teardown()
+        {
+            if (m_nodes)
+                m_allocator->deallocate(m_nodes);
+            if (m_neighbors)
+                m_allocator->deallocate(m_neighbors);
+            if (m_used)
+                m_allocator->deallocate(m_used);
+
+            m_freeStorage  = 0;
+            m_usedBinsTop  = 0;
+            m_freeOffset   = m_maxAllocs - 1;
+            m_nodes        = nullptr;
+            m_neighbors    = nullptr;
+            m_used         = nullptr;
+            m_freeIndex    = 0;
+            m_freeListHead = node_t::NIL;
+        }
+
         void offset_allocator_t::reset()
         {
             m_freeStorage = 0;
@@ -175,16 +202,6 @@ namespace ncore
             for (u32 i = 0; i < NUM_LEAF_BINS; i++)
                 m_binIndices[i] = node_t::NIL;
 
-            if (m_nodes)
-                m_allocator->deallocate(m_nodes);
-            if (m_neighbors)
-                m_allocator->deallocate(m_neighbors);
-            if (m_used)
-                m_allocator->deallocate(m_used);
-
-            m_nodes        = (node_t*)m_allocator->allocate(sizeof(node_t) * m_maxAllocs);
-            m_neighbors    = (neighbor_t*)m_allocator->allocate(sizeof(neighbor_t) * m_maxAllocs);
-            m_used         = (u32*)m_allocator->allocate((m_maxAllocs >> 5) * sizeof(u32));
             m_freeIndex    = 0;
             m_freeListHead = node_t::NIL;
 
@@ -414,7 +431,7 @@ namespace ncore
 #ifdef DEBUG_VERBOSE
             printf("Getting node %u from freelist[%u]\n", nodeIndex, m_freeOffset + 1);
 #endif
-            m_nodes[nodeIndex] = {.dataOffset = dataOffset, .dataSize = size, .binListNext = topNodeIndex};
+            m_nodes[nodeIndex]     = {.dataOffset = dataOffset, .dataSize = size, .binListNext = topNodeIndex};
             m_neighbors[nodeIndex] = {.prev = node_t::NIL, .next = node_t::NIL};
             setUnused(nodeIndex);
 
