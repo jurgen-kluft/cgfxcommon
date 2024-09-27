@@ -16,10 +16,13 @@ struct myresource_t {
     u32 data;
 };
 
-ngfx::nobject::pool_t pool(allocator, 10, sizeof(myresource_t));
+ngfx::nobject::array_t array(allocator, 10, sizeof(myresource_t));
+ngfx::nobject::pool_t pool;
+pool.setup(&array, allocator);
 u32 index = pool.allocate();
 void* resource = pool.get_access(index);
 pool.deallocate(index);
+pool.teardown();
 ```
 
 ## object pool (typed)
@@ -31,10 +34,12 @@ struct myresource_t {
     u32 data;
 };
 
-ngfx::nobject::ntyped::pool_t<myresource_t> pool(allocator, 10);
+ngfx::nobject::ntyped::pool_t<myresource_t> pool;
+pool.setup(allocator, 10);
 ngfx::handle_t handle = pool.allocate();
 myresource_t* resource = pool.get_access(handle);
 pool.deallocate(index);
+pool.teardown();
 ```
 
 ## resources pool (typed)
@@ -54,7 +59,8 @@ struct myresource_b_t {
 DEFINE_RESOURCE_TYPE(resource_b_t); // In the header file
 DECLARE_RESOURCE_TYPE(resource_b_t); // In the source file
 
-ngfx::nresources::pool_t pool(allocator, 10); // maximum 10 resource types
+ngfx::nresources::pool_t pool;
+pool.setup(allocator, 10); // maximum 10 resource types
 pool.register_resource<myresource_a_t>(32); // maximum 32 resources of type myresource_a_t
 pool.register_resource<myresource_b_t>(32); // maximum 32 resources of type myresource_b_t
 
@@ -66,6 +72,8 @@ myresource_b_t* resource_b = pool.get_access<myresource_b_t>(handle_b);
 
 pool.deallocate<myresource_a_t>(handle_a);
 pool.deallocate<myresource_b_t>(handle_b);
+
+pool.teardown();
 ```
 
 
@@ -92,7 +100,8 @@ struct myresource_b_t {
 DEFINE_OBJECT_RESOURCE_TYPE(resource_b_t); // In the header file
 DECLARE_OBJECT_RESOURCE_TYPE(resource_b_t); // In the source file
 
-ngfx::nobject_resources::pool_t pool(allocator, 10, 10); // maximum 10 object types and 10 resource types
+ngfx::nobject_resources::pool_t pool;
+pool.setup(allocator, 10, 10); // maximum 10 object types and 10 resource types
 
 pool.register_object_type<myobject_a_t>(32); // maximum 32 objects of type myobject_a_t
 pool.register_resource_type<myobject_a_t, myresource_a_t>(); 
@@ -110,4 +119,6 @@ pool.deallocate_resource<myresource_a_t>(handle_a_resource_a);
 pool.deallocate_resource<myresource_b_t>(handle_a_resource_b);
 
 pool.deallocate_object<myobject_a_t>(handle_a);
+
+pool.teardown();
 ```
