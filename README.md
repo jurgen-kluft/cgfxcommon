@@ -16,13 +16,18 @@ struct myresource_t {
     u32 data;
 };
 
-ngfx::nobject::array_t array(allocator, 10, sizeof(myresource_t));
+ngfx::nobject::array_t array;
+array.setup(allocator, 10, sizeof(myresource_t));
+
 ngfx::nobject::pool_t pool;
 pool.setup(&array, allocator);
+
 u32 index = pool.allocate();
 void* resource = pool.get_access(index);
 pool.deallocate(index);
+
 pool.teardown();
+array.teardown();
 ```
 
 ## object pool (typed)
