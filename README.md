@@ -53,16 +53,15 @@ A resource pool where the resources are typed and the pool can manage multiple r
 
 ```c++
 struct myresource_a_t {
+    DECLARE_RESOURCE_TYPE(0); // Indices are managed by user
     u32 data;
 };
 DEFINE_RESOURCE_TYPE(resource_a_t); // In the header file
-DECLARE_RESOURCE_TYPE(resource_a_t); // In the source file
 
 struct myresource_b_t {
+    DECLARE_RESOURCE_TYPE(1); // Indices are managed by user
     u32 data;
 };
-DEFINE_RESOURCE_TYPE(resource_b_t); // In the header file
-DECLARE_RESOURCE_TYPE(resource_b_t); // In the source file
 
 ngfx::nresources::pool_t pool;
 pool.setup(allocator, 10); // maximum 10 resource types
@@ -88,22 +87,19 @@ An object pool where an object can have multiple resources associated with it, t
 
 ```c++
 struct myobject_a_t {
+    DECLARE_OBJECT_TYPE(0); // Indices are managed by user
     u32 data;
 };
-DEFINE_OBJECT_TYPE(object_a_t); // In the header file
-DECLARE_OBJECT_TYPE(object_a_t); // In the source file
 
 struct myresource_a_t {
+    DECLARE_OBJECT_RESOURCE_TYPE(0); // Indices are managed by user
     u32 data;
 };
-DEFINE_OBJECT_RESOURCE_TYPE(resource_a_t); // In the header file
-DECLARE_OBJECT_RESOURCE_TYPE(resource_a_t); // In the source file
 
 struct myresource_b_t {
+    DECLARE_OBJECT_RESOURCE_TYPE(1); // Indices are managed by user
     u32 data;
 };
-DEFINE_OBJECT_RESOURCE_TYPE(resource_b_t); // In the header file
-DECLARE_OBJECT_RESOURCE_TYPE(resource_b_t); // In the source file
 
 ngfx::nobject_resources::pool_t pool;
 pool.setup(allocator, 10, 10); // maximum 10 object types and 10 resource types

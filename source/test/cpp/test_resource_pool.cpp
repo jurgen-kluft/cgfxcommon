@@ -9,9 +9,22 @@ namespace ncore
 {
     namespace ngfx
     {
+        enum EObjectTypes
+        {
+            kObjectA = 0,
+            kObjectB = 1,
+        };
+
+        enum EResourceTypes
+        {
+            kResourceA = 0,
+            kResourceB = 1,
+            kResourceC = 2,
+        };
+
         struct object_a_t
         {
-            DECLARE_OBJECT_TYPE(0);
+            DECLARE_OBJECT_TYPE(kObjectA);
             int   a;
             int   b;
             float c;
@@ -19,7 +32,7 @@ namespace ncore
 
         struct object_b_t
         {
-            DECLARE_OBJECT_TYPE(1);
+            DECLARE_OBJECT_TYPE(kObjectB);
             int   a;
             int   b;
             float c;
@@ -27,7 +40,7 @@ namespace ncore
 
         struct resource_a_t
         {
-            DECLARE_RESOURCE_TYPE(0);
+            DECLARE_RESOURCE_TYPE(kResourceA);
             int   a;
             int   b;
             float c;
@@ -35,7 +48,7 @@ namespace ncore
 
         struct resource_b_t
         {
-            DECLARE_RESOURCE_TYPE(1);
+            DECLARE_RESOURCE_TYPE(kResourceB);
             int   a;
             int   b;
             float c;
@@ -43,7 +56,7 @@ namespace ncore
 
         struct resource_c_t
         {
-            DECLARE_RESOURCE_TYPE(2);
+            DECLARE_RESOURCE_TYPE(kResourceC);
             int   a;
             int   b;
             float c;
