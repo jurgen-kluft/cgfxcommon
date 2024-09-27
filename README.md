@@ -52,14 +52,19 @@ pool.teardown();
 A resource pool where the resources are typed and the pool can manage multiple resources. The implementation is using the `object pool`.
 
 ```c++
+enum EResourceTypes
+{
+    kResourceA = 0,
+    kResourceB = 1,
+};
+
 struct myresource_a_t {
-    DECLARE_RESOURCE_TYPE(0); // Indices are managed by user
+    DECLARE_RESOURCE_TYPE(kResourceA); // Indices are managed by user
     u32 data;
 };
-DEFINE_RESOURCE_TYPE(resource_a_t); // In the header file
 
 struct myresource_b_t {
-    DECLARE_RESOURCE_TYPE(1); // Indices are managed by user
+    DECLARE_RESOURCE_TYPE(kResourceB); // Indices are managed by user
     u32 data;
 };
 
@@ -81,23 +86,34 @@ pool.teardown();
 ```
 
 
-## object resources pool
+## objects with resources pool
 
-An object pool where an object can have multiple resources associated with it, this is roughly similar to an Entity-Component type of design.
+An pool managing objects where an object can have multiple resources associated/attached with/to it.
 
 ```c++
+enum EObjectTypes
+{
+    kObjectA = 0,
+};
+
+enum EResourceTypes
+{
+    kResourceA = 0,
+    kResourceB = 1,
+};
+
 struct myobject_a_t {
-    DECLARE_OBJECT_TYPE(0); // Indices are managed by user
+    DECLARE_OBJECT_TYPE(kObjectA); // Indices are managed by user
     u32 data;
 };
 
 struct myresource_a_t {
-    DECLARE_OBJECT_RESOURCE_TYPE(0); // Indices are managed by user
+    DECLARE_OBJECT_RESOURCE_TYPE(kResourceA); // Indices are managed by user
     u32 data;
 };
 
 struct myresource_b_t {
-    DECLARE_OBJECT_RESOURCE_TYPE(1); // Indices are managed by user
+    DECLARE_OBJECT_RESOURCE_TYPE(kResourceB); // Indices are managed by user
     u32 data;
 };
 
