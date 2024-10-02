@@ -13,7 +13,7 @@ func GetPackage() *denv.Package {
 	basepkg := cbase.GetPackage()
 
 	// The main package
-	mainpkg := denv.NewPackage("cgfx")
+	mainpkg := denv.NewPackage("cgfxcommon")
 	mainpkg.AddPackage(unittestpkg)
 	mainpkg.AddPackage(basepkg)
 
