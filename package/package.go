@@ -24,7 +24,6 @@ func GetPackage() *denv.Package {
 	// 'cgfxcommon' unittest project
 	maintest := denv.SetupDefaultCppTestProject("cgfxcommon"+"_test", "github.com\\jurgen-kluft\\cgfxcommon")
 	maintest.Dependencies = append(maintest.Dependencies, unittestpkg.GetMainLib())
-	maintest.Dependencies = append(maintest.Dependencies, basepkg.GetMainLib())
 	maintest.Dependencies = append(maintest.Dependencies, mainlib)
 
 	mainpkg.AddMainLib(mainlib)
